@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignSpeak AI</title>
+  <meta name="description" content="Real-time hand sign recognition with AI-powered gesture detection and futuristic dashboard UI.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            midnight: '#050816',
+            galaxy: '#0F172A',
+            neonblue: '#00D4FF',
+            neonpurple: '#8B5CF6',
+            neongreen: '#00FFB3',
+            ice: '#CBD5E1'
+          },
+          boxShadow: {
+            glow: '0 0 40px rgba(0, 212, 255, 0.15)',
+            glowpurple: '0 0 28px rgba(139, 92, 246, 0.18)',
+            glass: '0 20px 100px rgba(15, 23, 42, .42)'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body class="bg-midnight text-white overflow-x-hidden selection:bg-neonblue/30 selection:text-white">
+  <div class="absolute inset-0 pointer-events-none overflow-hidden">
+    <div class="particle particle-1"></div>
+    <div class="particle particle-2"></div>
+    <div class="particle particle-3"></div>
+    <div class="scanline"></div>
+  </div>
+
+  <header class="relative z-20 px-6 pt-8 sm:px-10 lg:px-16">
+    <div class="max-w-7xl mx-auto flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <div class="inline-flex items-center gap-3 rounded-full bg-white/5 px-4 py-2 text-sm text-neongreen ring-1 ring-neonblue/20 backdrop-blur-sm">
+          <span class="text-neonblue">LIVE AI</span> Hand sign recognition dashboard
+        </div>
+        <div class="mt-6 flex flex-wrap items-center gap-4">
+          <h1 class="text-4xl sm:text-5xl font-semibold tracking-tight text-white">🤟 SignSpeak AI</h1>
+          <div class="inline-flex rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300 ring-1 ring-white/10">Premium 2026 AI UI</div>
+        </div>
+        <p class="mt-4 max-w-2xl text-lg leading-8 text-slate-300">Real-time hand sign recognition powered by AI, gesture detection, confidence insights, voice output, and an immersive futuristic dashboard experience.</p>
+      </div>
+
+      <div class="flex flex-wrap gap-3">
+        <button id="startBtn" class="btn-primary">Start Detection</button>
+        <button id="learnBtn" class="btn-secondary">Learn Signs</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="relative z-20 mt-12 px-6 pb-16 sm:px-10 lg:px-16">
+    <section class="grid gap-8 lg:grid-cols-[1.4fr_0.9fr] lg:items-stretch">
+      <article class="glass-card overflow-hidden shadow-glow purple-glow">
+        <div class="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <p class="text-sm text-neonblue uppercase tracking-[0.25em]">Live Camera</p>
+            <h2 class="mt-2 text-2xl font-semibold">Real-Time Hand Tracking</h2>
+          </div>
+          <div class="inline-flex rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.25em] text-slate-300">AI Powered</div>
+        </div>
+        <div class="relative bg-slate-950/90 p-4">
+          <div class="camera-shell">
+            <video id="webcam" class="rounded-3xl w-full shadow-glowpurple bg-black" autoplay muted playsinline></video>
+            <canvas id="overlayCanvas" class="absolute inset-0 h-full w-full rounded-3xl"></canvas>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-3 text-sm text-slate-300">
+            <span class="status-pill"><span class="dot bg-neongreen"></span> Active camera</span>
+            <span class="status-pill"><span class="dot bg-neonblue"></span> Landmark overlay</span>
+          </div>
+        </div>
+      </article>
+
+      <aside class="space-y-6">
+        <div class="glass-card shadow-glow">
+          <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+            <div>
+              <p class="text-sm uppercase tracking-[0.25em] text-neonblue">AI Result Panel</p>
+              <h3 class="mt-2 text-xl font-semibold">Detected Sign</h3>
+            </div>
+            <span id="statusBadge" class="rounded-full bg-slate-900/80 px-3 py-1 text-sm text-neongreen ring-1 ring-neongreen/20">Waiting</span>
+          </div>
+          <div class="p-6 space-y-4">
+            <div class="result-card">
+              <div class="result-icon">👋</div>
+              <div>
+                <p class="text-sm uppercase tracking-[0.25em] text-slate-400">Detected Sign</p>
+                <h4 id="detectedSign" class="mt-2 text-3xl font-semibold">Hello</h4>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-sm uppercase tracking-[0.25em] text-slate-400">Meaning</p>
+              <p id="meaningText" class="text-slate-200">Greet someone with a friendly open palm wave.</p>
+            </div>
+            <div class="space-y-2">
+              <p class="text-sm uppercase tracking-[0.25em] text-slate-400">Confidence</p>
+              <div class="w-full overflow-hidden rounded-full bg-slate-900/70">
+                <div id="confidenceBar" class="h-3 rounded-full bg-neonblue transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <p id="confidenceText" class="text-sm text-slate-300">0%</p>
+            </div>
+            <div class="space-y-2">
+              <p class="text-sm uppercase tracking-[0.25em] text-slate-400">Text Builder</p>
+              <div id="sentenceBubble" class="bubble-chat">Ready to build your sentence.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card shadow-glowpurple px-6 py-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm uppercase tracking-[0.25em] text-neonblue">Assistant</p>
+              <h3 class="mt-2 text-xl font-semibold">3D AI Guide</h3>
+            </div>
+            <button id="voiceToggle" class="toggle-btn" aria-pressed="true">Voice On</button>
+          </div>
+          <div class="assistant-panel mt-6">
+            <div class="assistant-avatar"></div>
+            <div>
+              <p class="text-sm text-slate-400">Assistant</p>
+              <p id="assistantText" class="mt-2 text-slate-200">Awaiting the first gesture. I will explain each sign as soon as it appears.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <button id="fullscreenBtn" class="btn-secondary">Full Screen Camera</button>
+          <button id="screenshotBtn" class="btn-secondary">Capture Screenshot</button>
+        </div>
+        <button id="downloadReportBtn" class="btn-primary w-full">Download Recognition Report</button>
+      </aside>
+    </section>
+
+    <section id="dictionary" class="mt-16 space-y-6">
+      <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p class="text-sm uppercase tracking-[0.25em] text-neonblue">Sign Dictionary</p>
+          <h2 class="mt-2 text-3xl font-semibold">Common Hand Signs</h2>
+        </div>
+        <div class="relative max-w-xl">
+          <input id="searchInput" type="search" placeholder="Search sign name or meaning..." class="w-full rounded-3xl border border-white/10 bg-white/5 px-5 py-3 text-slate-200 outline-none ring-1 ring-white/10 transition focus:ring-neonblue/60" />
+        </div>
+      </div>
+      <div id="cardGrid" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"></div>
+    </section>
+
+    <section class="mt-16 grid gap-6 lg:grid-cols-3">
+      <article class="glass-card shadow-glowpurple p-6">
+        <p class="text-sm uppercase tracking-[0.25em] text-neonblue">Total Signs Detected</p>
+        <h3 id="totalSignCount" class="mt-4 text-4xl font-semibold">0</h3>
+        <p class="mt-3 text-slate-400">Captured gestures for this session.</p>
+      </article>
+      <article class="glass-card shadow-glowpurple p-6">
+        <p class="text-sm uppercase tracking-[0.25em] text-neonblue">Recognition Accuracy</p>
+        <h3 id="accuracyValue" class="mt-4 text-4xl font-semibold">0%</h3>
+        <p class="mt-3 text-slate-400">Average confidence across all detections.</p>
+      </article>
+      <article class="glass-card shadow-glowpurple p-6">
+        <p class="text-sm uppercase tracking-[0.25em] text-neonblue">Signs Per Minute</p>
+        <h3 id="spmValue" class="mt-4 text-4xl font-semibold">0</h3>
+        <p class="mt-3 text-slate-400">Live pace of recognition events.</p>
+      </article>
+    </section>
+
+    <section class="mt-16 grid gap-6 lg:grid-cols-2">
+      <div class="glass-card shadow-glow p-6 overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm uppercase tracking-[0.25em] text-neonblue">Session Duration</p>
+            <h3 id="sessionDuration" class="mt-2 text-3xl font-semibold">00:00:00</h3>
+          </div>
+          <div class="ring-chart">
+            <span id="durationRing" class="ring-percent">0%</span>
+          </div>
+        </div>
+        <p class="mt-5 text-slate-400">How long your recognition session has been active.</p>
+      </div>
+      <div class="glass-card shadow-glow p-6">
+        <p class="text-sm uppercase tracking-[0.25em] text-neonblue">AI Confidence Meter</p>
+        <div class="mt-6 space-y-4">
+          <div class="meter-row">
+            <span>Excellent</span>
+            <span id="meterExcellent" class="text-slate-200">0%</span>
+          </div>
+          <div class="meter-track"><span id="meterTrack" class="meter-fill"></span></div>
+          <p class="text-slate-400">Confidence trends update as signs are detected.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="relative z-20 px-6 pb-10 sm:px-10 lg:px-16">
+    <div class="max-w-7xl mx-auto rounded-3xl bg-white/5 px-6 py-5 text-sm text-slate-400 ring-1 ring-white/10 backdrop-blur-sm">Designed with futuristic gradients, glassmorphism, and AI gesture interaction for 2026-ready sign recognition.</div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
